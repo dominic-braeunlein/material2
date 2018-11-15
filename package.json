@@ -25,7 +25,7 @@
     "gulp": "gulp",
     "stage-release": "bash ./tools/release/stage-release-bin.sh",
     "preinstall": "node ./tools/npm/check-npm.js",
-    "prepare": "npm run build"
+    "prepare": "gulp material:build-release"
   },
   "version": "7.0.3",
   "requiredAngularVersion": ">=7.0.0",
