@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {coerceArray, coerceBooleanProperty} from '@angular/cdk/coercion';
+import { coerceArray, coerceBooleanProperty } from '@angular/cdk/coercion';
 import {
   ContentChildren,
   ElementRef,
@@ -18,16 +18,19 @@ import {
   Output,
   QueryList,
   Optional,
+  SkipSelf,
   Directive,
   ChangeDetectorRef,
+  Inject
 } from '@angular/core';
-import {Directionality} from '@angular/cdk/bidi';
-import {CdkDrag} from './drag';
-import {DragDropRegistry} from './drag-drop-registry';
-import {CdkDragDrop, CdkDragEnter, CdkDragExit, CdkDragSortEvent} from './drag-events';
-import {moveItemInArray} from './drag-utils';
-import {CDK_DROP_LIST_CONTAINER} from './drop-list-container';
-import {CdkDropListGroup} from './drop-list-group';
+import { Directionality } from '@angular/cdk/bidi';
+import { CdkDrag } from './drag';
+import { DragDropRegistry } from './drag-drop-registry';
+import { CdkDragDrop, CdkDragEnter, CdkDragExit, CdkDragSortEvent } from './drag-events';
+import { moveItemInArray } from './drag-utils';
+import { CDK_DROP_LIST_CONTAINER } from './drop-list-container';
+import { CDK_DROP_PARENT } from './drop-list-container';
+import { CdkDropListGroup } from './drop-list-group';
 
 
 /** Counter used to generate unique ids for drop zones. */
@@ -43,7 +46,7 @@ const DROP_PROXIMITY_THRESHOLD = 0.05;
  * Object used to cache the position of a drag list, its items. and siblings.
  * @docs-private
  */
-interface PositionCache {
+export interface PositionCache {
   /** Cached positions of the items in the list. */
   items: ItemPositionCacheEntry[];
   /** Cached positions of the connected lists. */
@@ -51,6 +54,7 @@ interface PositionCache {
   /** Dimensions of the list itself. */
   self: ClientRect;
 }
+
 
 /**
  * Entry in the position cache for draggable items.
@@ -69,7 +73,7 @@ interface ItemPositionCacheEntry {
  * Entry in the position cache for drop lists.
  * @docs-private
  */
-interface ListPositionCacheEntry {
+export interface ListPositionCacheEntry {
   /** Instance of the drop list. */
   drop: CdkDropList;
   /** Dimensions of the list. */
@@ -81,7 +85,8 @@ interface ListPositionCacheEntry {
   selector: '[cdkDropList], cdk-drop-list',
   exportAs: 'cdkDropList',
   providers: [
-    {provide: CDK_DROP_LIST_CONTAINER, useExisting: CdkDropList},
+    { provide: CDK_DROP_LIST_CONTAINER, useExisting: CdkDropList },
+    { provide: CDK_DROP_PARENT, useExisting: CdkDropList }
   ],
   host: {
     'class': 'cdk-drop-list',
@@ -121,8 +126,12 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
   get disabled(): boolean { return this._disabled; }
   set disabled(value: boolean) {
     this._disabled = coerceBooleanProperty(value);
+    console.log('isDisabled::: ' + this._disabled);
   }
   private _disabled = false;
+
+
+  // dragDisabled = false;
 
   /**
    * Function that is used to determine whether an item
@@ -157,7 +166,9 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
     private _dragDropRegistry: DragDropRegistry<CdkDrag, CdkDropList<T>>,
     private _changeDetectorRef: ChangeDetectorRef,
     @Optional() private _dir?: Directionality,
-    @Optional() private _group?: CdkDropListGroup<CdkDropList>) {}
+    @Optional() private _group?: CdkDropListGroup<CdkDropList>,
+    @Inject(CDK_DROP_PARENT) @Optional() @SkipSelf()
+    private _dropParent?: CdkDropList) { }
 
   ngOnInit() {
     this._dragDropRegistry.registerDropContainer(this);
@@ -179,7 +190,7 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
   _dragging = false;
 
   /** Cache of the dimensions of all the items and the sibling containers. */
-  private _positionCache: PositionCache = {items: [], siblings: [], self: {} as ClientRect};
+  public _positionCache: PositionCache = { items: [], siblings: [], self: {} as ClientRect };
 
   /**
    * Draggable items that are currently active inside the container. Includes the items
@@ -192,7 +203,7 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * Keeps track of the item that was last swapped with the dragged item, as
    * well as what direction the pointer was moving in when the swap occured.
    */
-  private _previousSwap = {drag: null as CdkDrag | null, delta: 0};
+  private _previousSwap = { drag: null as CdkDrag | null, delta: 0 };
 
   /** Starts dragging an item. */
   start(): void {
@@ -220,6 +231,20 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
     });
   }
 
+  stopDragOver(): void {
+    console.log('stopDragOver:::');
+    // this.disabled = true;
+    // this.dragDisabled = true;
+  }
+
+  startDragOver(): void {
+    console.log('startDragOver:::');
+    // this.disabled = false;
+
+    // this.dragDisabled = false;
+    // this.disabled = false;
+  }
+
   /**
    * Emits an event to indicate that the user moved an item into the container.
    * @param item Item that was moved into the container.
@@ -227,7 +252,16 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param pointerY Position of the item along the Y axis.
    */
   enter(item: CdkDrag, pointerX: number, pointerY: number): void {
-    this.entered.emit({item, container: this});
+
+    // if (this._dropParent != null) {
+    //   console.log('_dropParent not null');
+    //   this._dropParent.stopDragOver()
+    // }
+    // if (this.disabled) {
+    //   return;
+    // }
+
+    this.entered.emit({ item, container: this });
     this.start();
 
     // We use the coordinates of where the item entered the drop
@@ -267,8 +301,14 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param item Item that was dragged out.
    */
   exit(item: CdkDrag): void {
+    // if (this._dropParent != null) {
+    //   this._dropParent.startDragOver()
+    // }
+    // if (this.disabled) {
+    //   return;
+    // }
     this._reset();
-    this.exited.emit({item, container: this});
+    this.exited.emit({ item, container: this });
   }
 
   /**
@@ -276,6 +316,7 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param item Item whose index should be determined.
    */
   getItemIndex(item: CdkDrag): number {
+    console.log('getItemIndex:::');
     if (!this._dragging) {
       return this._draggables.toArray().indexOf(item);
     }
@@ -284,7 +325,7 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
     // The rest of the logic still stands no matter what orientation we're in, however
     // we need to invert the array when determining the index.
     const items = this.orientation === 'horizontal' && this._dir && this._dir.value === 'rtl' ?
-        this._positionCache.items.slice().reverse() : this._positionCache.items;
+      this._positionCache.items.slice().reverse() : this._positionCache.items;
 
     return findIndex(items, currentItem => currentItem.drag === item);
   }
@@ -297,7 +338,12 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param pointerDeta Direction in which the pointer is moving along each axis.
    */
   _sortItem(item: CdkDrag, pointerX: number, pointerY: number,
-            pointerDelta: {x: number, y: number}): void {
+    pointerDelta: { x: number, y: number }): void {
+
+    // if (this.disabled) {
+    //   return;
+    // }
+
     // Don't sort the item if it's out of range.
     if (!this._isPointerNearDropContainer(pointerX, pointerY)) {
       return;
@@ -349,7 +395,7 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
       const isDraggedItem = sibling.drag === item;
       const offset = isDraggedItem ? itemOffset : siblingOffset;
       const elementToOffset = isDraggedItem ? item.getPlaceholderElement() :
-                                              sibling.drag.getRootElement();
+        sibling.drag.getRootElement();
 
       // Update the offset to reflect the new position.
       sibling.offset += offset;
@@ -375,11 +421,14 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param x Position of the item along the X axis.
    * @param y Position of the item along the Y axis.
    */
-  _getSiblingContainerFromPosition(item: CdkDrag, x: number, y: number): CdkDropList | null {
-    const result = this._positionCache.siblings
-        .find(sibling => isInsideClientRect(sibling.clientRect, x, y));
+  _getSiblingContainerFromPosition(item: CdkDrag, x: number, y: number): ListPositionCacheEntry | null {
+    const resultList = this._positionCache.siblings
+      .filter(sibling => isInsideClientRect(sibling.clientRect, x, y));
 
-    return result && result.drop.enterPredicate(item, result.drop) ? result.drop : null;
+    resultList.sort((r) => -r.clientRect.width * r.clientRect.height);
+    const result = resultList[0];
+
+    return result && result.drop.enterPredicate(item, result.drop) ? result : null;
   }
 
   /**
@@ -400,10 +449,10 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
     this._positionCache.items = this._activeDraggables
       .map(drag => {
         const elementToMeasure = this._dragDropRegistry.isDragging(drag) ?
-            // If the element is being dragged, we have to measure the
-            // placeholder, because the element is hidden.
-            drag.getPlaceholderElement() :
-            drag.getRootElement();
+          // If the element is being dragged, we have to measure the
+          // placeholder, because the element is hidden.
+          drag.getPlaceholderElement() :
+          drag.getRootElement();
         const clientRect = elementToMeasure.getBoundingClientRect();
 
         return {
@@ -425,7 +474,7 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
       })
       .sort((a, b) => {
         return isHorizontal ? a.clientRect.left - b.clientRect.left :
-                              a.clientRect.top - b.clientRect.top;
+          a.clientRect.top - b.clientRect.top;
       });
 
     this._positionCache.siblings = this._getConnectedLists().map(drop => ({
@@ -439,7 +488,9 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
     this._dragging = false;
 
     // TODO(crisbeto): may have to wait for the animations to finish.
-    this._activeDraggables.forEach(item => item.getRootElement().style.transform = '');
+    if (this._activeDraggables != null) {
+      this._activeDraggables.forEach(item => item.getRootElement().style.transform = '');
+    }
     this._activeDraggables = [];
     this._positionCache.items = [];
     this._positionCache.siblings = [];
@@ -469,11 +520,11 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param delta Direction in which the user is moving their pointer.
    */
   private _getItemIndexFromPointerPosition(item: CdkDrag, pointerX: number, pointerY: number,
-                                           delta?: {x: number, y: number}) {
+    delta?: { x: number, y: number }) {
 
     const isHorizontal = this.orientation === 'horizontal';
 
-    return findIndex(this._positionCache.items, ({drag, clientRect}, _, array) => {
+    return findIndex(this._positionCache.items, ({ drag, clientRect }, _, array) => {
       if (drag === item) {
         // If there's only one item left in the container, it must be
         // the dragged item itself so we use it as a reference.
@@ -491,10 +542,10 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
       }
 
       return isHorizontal ?
-          // Round these down since most browsers report client rects with
-          // sub-pixel precision, whereas the pointer coordinates are rounded to pixels.
-          pointerX >= Math.floor(clientRect.left) && pointerX <= Math.floor(clientRect.right) :
-          pointerY >= Math.floor(clientRect.top) && pointerY <= Math.floor(clientRect.bottom);
+        // Round these down since most browsers report client rects with
+        // sub-pixel precision, whereas the pointer coordinates are rounded to pixels.
+        pointerX >= Math.floor(clientRect.left) && pointerX <= Math.floor(clientRect.right) :
+        pointerY >= Math.floor(clientRect.top) && pointerY <= Math.floor(clientRect.bottom);
     });
   }
 
@@ -504,12 +555,12 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param pointerY Coordinates along the Y axis.
    */
   private _isPointerNearDropContainer(pointerX: number, pointerY: number): boolean {
-    const {top, right, bottom, left, width, height} = this._positionCache.self;
+    const { top, right, bottom, left, width, height } = this._positionCache.self;
     const xThreshold = width * DROP_PROXIMITY_THRESHOLD;
     const yThreshold = height * DROP_PROXIMITY_THRESHOLD;
 
     return pointerY > top - yThreshold && pointerY < bottom + yThreshold &&
-           pointerX > left - xThreshold && pointerX < right + xThreshold;
+      pointerX > left - xThreshold && pointerX < right + xThreshold;
   }
 
   /**
@@ -521,12 +572,12 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
   private _getItemOffsetPx(currentPosition: ClientRect, newPosition: ClientRect, delta: 1 | -1) {
     const isHorizontal = this.orientation === 'horizontal';
     let itemOffset = isHorizontal ? newPosition.left - currentPosition.left :
-                                    newPosition.top - currentPosition.top;
+      newPosition.top - currentPosition.top;
 
     // Account for differences in the item width/height.
     if (delta === -1) {
       itemOffset += isHorizontal ? newPosition.width - currentPosition.width :
-                                   newPosition.height - currentPosition.height;
+        newPosition.height - currentPosition.height;
     }
 
     return itemOffset;
@@ -539,8 +590,8 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
    * @param delta Direction in which the user is moving.
    */
   private _getSiblingOffsetPx(currentIndex: number,
-                              siblings: ItemPositionCacheEntry[],
-                              delta: 1 | -1) {
+    siblings: ItemPositionCacheEntry[],
+    delta: 1 | -1) {
 
     const isHorizontal = this.orientation === 'horizontal';
     const currentPosition = siblings[currentIndex].clientRect;
@@ -591,7 +642,7 @@ export class CdkDropList<T = any> implements OnInit, OnDestroy {
  * @param predicate Function used to determine whether an item is a match.
  */
 function findIndex<T>(array: T[],
-                      predicate: (value: T, index: number, obj: T[]) => boolean): number {
+  predicate: (value: T, index: number, obj: T[]) => boolean): number {
 
   for (let i = 0; i < array.length; i++) {
     if (predicate(array[i], i, array)) {
@@ -610,6 +661,6 @@ function findIndex<T>(array: T[],
  * @param y Coordinates along the Y axis.
  */
 function isInsideClientRect(clientRect: ClientRect, x: number, y: number) {
-  const {top, bottom, left, right} = clientRect;
+  const { top, bottom, left, right } = clientRect;
   return y >= top && y <= bottom && x >= left && x <= right;
 }

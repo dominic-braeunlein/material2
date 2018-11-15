@@ -5,24 +5,27 @@
     <mat-slide-toggle color="primary" [(ngModel)]="cloneMode">
       Clone Mode
     </mat-slide-toggle>
-    <div
-      cdkDropList
-      (cdkDropListDropped)="drop($event)"
-      [cdkDropListLockAxis]="axisLock"
-      [cdkDropListData]="todo">
+    <div cdkDropList (cdkDropListDropped)="drop($event)" [cdkDropListData]="todo">
       <div *ngFor="let item of todo" cdkDrag>
         {{item}}
-        <mat-icon cdkDragHandle svgIcon="dnd-move"></mat-icon>
+        <div cdkDropList class="nested" (cdkDropListDropped)="drop($event)" [cdkDropListData]="nestedTodo">
+          <div *ngFor="let otherItem of nestedTodo" cdkDrag>
+            {{otherItem}}
+            <mat-icon cdkDragHandle svgIcon="dnd-move"></mat-icon>
+          </div>
+          <mat-icon cdkDragHandle svgIcon="dnd-move"></mat-icon>
+        </div>
+
+
       </div>
+
+
     </div>
   </div>
 
   <div class="demo-list">
     <h2>Done</h2>
-    <div
-      cdkDropList
-      (cdkDropListDropped)="drop($event)"
-      [cdkDropListLockAxis]="axisLock"
+    <div cdkDropList (cdkDropListDropped)="drop($event)" [cdkDropListLockAxis]="axisLock"
       [cdkDropListData]="done">
       <div *ngFor="let item of done" cdkDrag>
         {{item}}
@@ -35,12 +38,8 @@
 <div>
   <div class="demo-list demo-list-horizontal">
     <h2>Horizontal list</h2>
-    <div
-      cdkDropList
-      cdkDropListOrientation="horizontal"
-      (cdkDropListDropped)="drop($event)"
-      [cdkDropListLockAxis]="axisLock"
-      [cdkDropListData]="horizontalData">
+    <div cdkDropList cdkDropListOrientation="horizontal" (cdkDropListDropped)="drop($event)"
+      [cdkDropListLockAxis]="axisLock" [cdkDropListData]="horizontalData">
       <div *ngFor="let item of horizontalData" cdkDrag>
         {{item}}
         <mat-icon cdkDragHandle svgIcon="dnd-move"></mat-icon>

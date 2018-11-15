@@ -24,7 +24,8 @@
     "breaking-changes": "gulp breaking-changes",
     "gulp": "gulp",
     "stage-release": "bash ./tools/release/stage-release-bin.sh",
-    "preinstall": "node ./tools/npm/check-npm.js"
+    "preinstall": "node ./tools/npm/check-npm.js",
+    "prepare": "npm run build"
   },
   "version": "7.0.3",
   "requiredAngularVersion": ">=7.0.0",
